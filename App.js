@@ -10,6 +10,7 @@ import QuizScreen from './src/screens/QuizScreen';
 import DetailScreen from './src/screens/DetailScreen';
 import PaywallScreen from './src/screens/PaywallScreen';
 import ReviewsScreen from './src/screens/ReviewsScreen';
+import SearchScreen from './src/screens/SearchScreen';
 import PlansScreen from './src/screens/PlansScreen';
 import Tabs from './src/Tabs';
 
@@ -28,6 +29,7 @@ export default function App() {
           <Stack.Screen name="Detail" component={DetailScreen} />
           <Stack.Screen name="Paywall" component={PaywallScreen} />
           <Stack.Screen name="Reviews" component={ReviewsScreen} />
+          <Stack.Screen name="Search" component={SearchScreen} />
           <Stack.Screen name="Plans" component={PlansScreen} />
         </Stack.Navigator>
       </NavigationContainer>

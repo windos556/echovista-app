@@ -1,17 +1,13 @@
-import React, { useMemo } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Image, FlatList } from 'react-native';
+import React, { useState } from 'react';
+import { View, Text, StyleSheet, TouchableOpacity, Image, ScrollView } from 'react-native';
+import MapView, { Marker, Callout } from 'react-native-maps';
 import { Ionicons } from '@expo/vector-icons';
 import { colors, radius } from '../theme/theme';
 import { useAppState } from '../data/AppState';
+import { coords, mapRegion, itineraries } from '../data/itineraries';
 
 export default function MapScreen({ navigation }) {
-  const { userName, userTier, landmarks, quizAnswers } = useAppState();
-
-  const greetingName = userName === 'Guest' ? 'Nearby echoes' : `${userName.split(' ')[0]}'s echoes`;
-  const recommended = useMemo(
-    () => landmarks.find(l => l.category === quizAnswers.interest) || null,
-    [landmarks, quizAnswers]
-  );
+  const { userName, userTier, landmarks } = useAppState();
 
   function openLandmark(landmark) {
     if (landmark.premium && userTier === 'free') {
@@ -21,72 +17,132 @@ export default function MapScreen({ navigation }) {
     navigation.navigate('Detail', { id: landmark.id });
   }
 
+  function openItinerary(itinerary) {
+    // For now, open the first landmark in the itinerary — a dedicated
+    // itinerary detail screen (multi-stop) is a natural next screen to add.
+    const first = landmarks.find(l => l.id === itinerary.landmarkIds[0]);
+    if (first) openLandmark(first);
+  }
+
   return (
     <View style={styles.container}>
-      <View style={styles.topbar}>
-        <View>
-          <Text style={styles.eyebrow}>Good evening</Text>
-          <Text style={styles.h2}>{greetingName}</Text>
-        </View>
+      <MapView style={styles.map} initialRegion={mapRegion}>
+        {landmarks.map((l, i) => {
+          const locked = l.premium && userTier === 'free';
+          return (
+            <Marker key={l.id} coordinate={coords[l.id]} onPress={() => openLandmark(l)}>
+              <View style={[styles.pinBadge, locked && styles.pinBadgeLocked]}>
+                <Text style={styles.pinBadgeText}>{i + 1}</Text>
+              </View>
+              <Callout onPress={() => openLandmark(l)} tooltip>
+                <View style={styles.calloutCard}>
+                  <Image source={{ uri: l.img }} style={styles.calloutThumb} />
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.calloutTitle} numberOfLines={1}>{l.name}</Text>
+                    <Text style={styles.calloutMeta}>{locked ? 'Premium · Tap to unlock' : `${l.duration} audio tour`}</Text>
+                  </View>
+                </View>
+              </Callout>
+            </Marker>
+          );
+        })}
+      </MapView>
+
+      <View style={styles.topOverlay}>
         <View style={styles.avatar}>
           <Text style={styles.avatarText}>{(userName[0] || 'G').toUpperCase()}</Text>
         </View>
+        <TouchableOpacity style={styles.searchPill} onPress={() => navigation.navigate('Search')}>
+          <Ionicons name="search" size={15} color={colors.inkSoft} />
+          <Text style={styles.searchPillText}>Search stories in Karachi</Text>
+        </TouchableOpacity>
+        <TouchableOpacity style={styles.iconCircle} onPress={() => navigation.navigate('Profile')}>
+          <Ionicons name="options-outline" size={17} color={colors.forestDeep} />
+        </TouchableOpacity>
       </View>
 
-      {recommended && (
-        <TouchableOpacity style={styles.reco} onPress={() => openLandmark(recommended)}>
-          <Text style={styles.recoTag}>Because you love it</Text>
-          <Text style={styles.recoText}>
-            Start with <Text style={{ color: colors.gold, fontWeight: '700' }}>{recommended.name}</Text> — picked for you
-          </Text>
-        </TouchableOpacity>
-      )}
-
-      <Text style={styles.sectionLabel}>{landmarks.length} stories within walking distance</Text>
-      <FlatList
-        data={landmarks}
-        keyExtractor={item => String(item.id)}
-        contentContainerStyle={{ padding: 16, paddingTop: 4 }}
-        renderItem={({ item }) => {
-          const locked = item.premium && userTier === 'free';
-          return (
-            <TouchableOpacity style={styles.card} onPress={() => openLandmark(item)}>
-              <Image source={{ uri: item.img }} style={styles.thumb} />
-              {locked && (
-                <View style={styles.lockOverlay}>
-                  <Ionicons name="lock-closed" size={16} color={colors.parchment} />
+      <View style={styles.sheet}>
+        <Text style={styles.sheetTitle}>Available itineraries in Karachi</Text>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: 18, gap: 14 }}>
+          {itineraries.map(it => (
+            <TouchableOpacity key={it.id} style={styles.itCard} onPress={() => openItinerary(it)}>
+              <Image source={{ uri: it.img }} style={styles.itImg} />
+              <View style={styles.itBody}>
+                <Text style={styles.itTitle} numberOfLines={1}>{it.title}</Text>
+                <Text style={styles.itMeta}>{it.distance} away</Text>
+                <View style={styles.itRow}>
+                  <View style={styles.itStat}>
+                    <Ionicons name="location-outline" size={12} color={colors.forestMid} />
+                    <Text style={styles.itStatText}>{it.landmarkIds.length} stops</Text>
+                  </View>
+                  <View style={styles.itStat}>
+                    <Ionicons name="time-outline" size={12} color={colors.forestMid} />
+                    <Text style={styles.itStatText}>{it.duration}</Text>
+                  </View>
                 </View>
-              )}
-              <View style={{ flex: 1 }}>
-                <Text style={styles.cardName}>
-                  {item.name} {item.premium ? <Text style={styles.premiumTag}> PREMIUM </Text> : null}
-                </Text>
-                <Text style={styles.cardMeta}>{item.year} · {item.distance}</Text>
+                <View style={styles.itFooter}>
+                  <Text style={styles.itPrice}>{it.price}</Text>
+                  <View style={styles.itBtn}><Text style={styles.itBtnText}>View</Text></View>
+                </View>
               </View>
-              <Ionicons name="chevron-forward" size={18} color={colors.inkSoft} />
             </TouchableOpacity>
-          );
-        }}
-      />
+          ))}
+        </ScrollView>
+      </View>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.parchment },
-  topbar: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 20, paddingTop: 56 },
-  eyebrow: { fontSize: 10.5, textTransform: 'uppercase', letterSpacing: 1, color: colors.inkSoft },
-  h2: { fontSize: 21, fontWeight: '700', color: colors.forestDeep },
-  avatar: { width: 36, height: 36, borderRadius: 18, backgroundColor: colors.forestMid, alignItems: 'center', justifyContent: 'center' },
+  map: { flex: 1 },
+
+  topOverlay: {
+    position: 'absolute', top: 54, left: 16, right: 16,
+    flexDirection: 'row', alignItems: 'center', gap: 10,
+  },
+  avatar: { width: 40, height: 40, borderRadius: 20, backgroundColor: colors.forestMid, alignItems: 'center', justifyContent: 'center', shadowColor: '#000', shadowOpacity: 0.2, shadowRadius: 6, elevation: 4 },
   avatarText: { color: colors.parchment, fontWeight: '700' },
-  reco: { marginHorizontal: 16, marginBottom: 12, backgroundColor: colors.forestDeep, borderRadius: 18, padding: 14 },
-  recoTag: { color: 'rgba(242,236,220,0.65)', fontSize: 9, textTransform: 'uppercase', letterSpacing: 1 },
-  recoText: { color: colors.parchment, fontSize: 14, marginTop: 4 },
-  sectionLabel: { fontWeight: '700', fontSize: 14, color: colors.forestDeep, marginLeft: 16, marginTop: 4 },
-  card: { flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: colors.card, borderRadius: radius.md, padding: 10, marginBottom: 10 },
-  thumb: { width: 52, height: 52, borderRadius: 12, backgroundColor: colors.parchmentDim },
-  lockOverlay: { position: 'absolute', left: 10, top: 10, width: 52, height: 52, borderRadius: 12, backgroundColor: 'rgba(15,20,17,0.45)', alignItems: 'center', justifyContent: 'center' },
-  cardName: { fontWeight: '700', fontSize: 14.5, color: colors.ink },
-  premiumTag: { fontSize: 8, backgroundColor: colors.gold, color: '#1C1608', borderRadius: 5, overflow: 'hidden' },
-  cardMeta: { fontSize: 11, color: colors.inkSoft, marginTop: 2 },
+  searchPill: {
+    flex: 1, flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: colors.card,
+    borderRadius: 22, paddingVertical: 11, paddingHorizontal: 14,
+    shadowColor: '#000', shadowOpacity: 0.15, shadowRadius: 6, elevation: 4,
+  },
+  searchPillText: { color: colors.inkSoft, fontSize: 12.5 },
+  iconCircle: { width: 40, height: 40, borderRadius: 20, backgroundColor: colors.card, alignItems: 'center', justifyContent: 'center', shadowColor: '#000', shadowOpacity: 0.15, shadowRadius: 6, elevation: 4 },
+
+  pinBadge: {
+    width: 34, height: 34, borderRadius: 17, backgroundColor: colors.card, borderWidth: 2, borderColor: colors.forestDeep,
+    alignItems: 'center', justifyContent: 'center',
+  },
+  pinBadgeLocked: { borderColor: colors.gold },
+  pinBadgeText: { fontWeight: '700', color: colors.forestDeep, fontSize: 13 },
+
+  calloutCard: {
+    flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: colors.card, borderRadius: 14, padding: 8,
+    width: 190, shadowColor: '#000', shadowOpacity: 0.2, shadowRadius: 6,
+  },
+  calloutThumb: { width: 40, height: 40, borderRadius: 10 },
+  calloutTitle: { fontWeight: '700', fontSize: 12.5, color: colors.ink },
+  calloutMeta: { fontSize: 9.5, color: colors.inkSoft, marginTop: 1 },
+
+  sheet: {
+    position: 'absolute', bottom: 0, left: 0, right: 0, backgroundColor: colors.parchment,
+    borderTopLeftRadius: 26, borderTopRightRadius: 26, paddingTop: 16, paddingBottom: 18,
+    shadowColor: '#000', shadowOpacity: 0.15, shadowRadius: 10, elevation: 8,
+  },
+  sheetTitle: { fontSize: 17, fontWeight: '700', color: colors.forestDeep, marginBottom: 12, paddingHorizontal: 18 },
+
+  itCard: { width: 190, backgroundColor: colors.card, borderRadius: 18, overflow: 'hidden', shadowColor: '#000', shadowOpacity: 0.08, shadowRadius: 6, elevation: 2 },
+  itImg: { width: '100%', height: 90 },
+  itBody: { padding: 10 },
+  itTitle: { fontWeight: '700', fontSize: 13, color: colors.ink },
+  itMeta: { fontSize: 10, color: colors.inkSoft, marginTop: 2 },
+  itRow: { flexDirection: 'row', gap: 10, marginTop: 8 },
+  itStat: { flexDirection: 'row', alignItems: 'center', gap: 3 },
+  itStatText: { fontSize: 9.5, color: colors.forestMid },
+  itFooter: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 10 },
+  itPrice: { fontWeight: '700', fontSize: 12, color: colors.forestDeep },
+  itBtn: { backgroundColor: colors.forestDeep, borderRadius: 10, paddingVertical: 6, paddingHorizontal: 12 },
+  itBtnText: { color: colors.parchment, fontSize: 10.5, fontWeight: '700' },
 });
